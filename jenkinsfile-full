@@ -1,0 +1,49 @@
+node( ' ' ){
+def mavenHome = tool name: "Maven_3.8.6"
+stage( '1.initiation' ){
+sh "echo start of web-app"
+}
+stage( '2.Gitclone' ){
+sh "echo Start of Gitclone"
+git credentialsId: 'd1068b0a-f214-443f-9737-2c22fcbb0935', url: 'https://github.com/omorogbeosagie16/web-app.git'
+}
+stage( '3.Build' ){
+sh "echo start of build"
+sh "${mavenHome}/bin/mvn package"
+}
+stage('4.CodeQuality'){
+sh "echo performing SonarQube Test"
+sh "${mavenHome}/bin/mvn sonar:sonar"
+}
+stage('5.BackupArtifacts'){
+sh "echo backup to Nexus"
+sh "${mavenHome}/bin/mvn deploy"
+}
+stage('6.DeploytoStaging'){
+sh "echo Deploy to Tomcat deployment"
+deploy adapters: [tomcat9(credentialsId: '1f75eb2f-c86d-4203-b461-c24b325ab64b', path: '', url: 'http://18.217.143.90:8080/')], contextPath: null, war: 'target/*.war'
+}
+stage('7.Approval'){
+sh "echo Approval needed"
+timeout(time:5, unit:"DAYS"){
+input message: 'Approval for UAT'
+}
+}
+stage('8.DeploytoUAT'){
+sh "echo Deploy to UAT"
+deploy adapters: [tomcat9(credentialsId: '1f75eb2f-c86d-4203-b461-c24b325ab64b', path: '', url: 'http://18.217.143.90:8080/')], contextPath: null, war: 'target/*.war'
+}
+stage('9.Approval'){
+sh "echo Approval needed"
+timeout(time:2, unit:"DAYS"){
+input message: 'Approval for Production'
+}
+}
+stage('10.DeploytoProduction'){
+sh "echo start tomcat deployment"
+deploy adapters: [tomcat9(credentialsId: '1f75eb2f-c86d-4203-b461-c24b325ab64b', path: '', url: 'http://18.217.143.90:8080/')], contextPath: null, war: 'target/*.war'
+}
+stage('11.EmailHook'){
+emailext body: 'BUILD SUCCEEDED.', recipientProviders: [developers()], subject: 'UAT BUILD', to: 'omorogbe.osagie@outlook.com'
+}
+}
